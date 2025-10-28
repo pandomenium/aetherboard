@@ -1,0 +1,264 @@
+/* ===== Base ===== */
+ body {
+  margin: 0;
+  font-family: "Inter", sans-serif;
+  background: linear-gradient(to bottom right, #f9fafb, #e5e7eb);
+  color: #222;
+  transition: background 0.3s, color 0.3s;
+}
+
+body.dark {
+  background: linear-gradient(to bottom right, #12121f, #181826, #1c1c2b);
+  color: #000000;
+
+}
+
+/* ===== Layout ===== */
+.dashboard {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  border-right: 1px solid rgba(0, 0, 0, 0.1);
+  transition: width 0.3s ease, background 0.3s ease;
+  padding: 20px;
+  overflow-x: hidden;
+}
+
+.sidebar.expanded {
+  width: 260px;
+}
+
+.sidebar.collapsed {
+  width: 80px;
+}
+
+/* ===== Sidebar Items ===== */
+.logo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  font-weight: bold;
+  color: #4f46e5;
+}
+
+.toggle-icon {
+  font-size: 18px;
+  color: #666;
+}
+
+nav {
+  margin-top: 20px;
+}
+
+.nav-item {
+  position: relative;
+  margin-bottom: 10px;
+}
+
+.nav-item a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 8px;
+  transition: background 0.3s, color 0.3s;
+}
+
+.nav-item a:hover {
+  background: rgba(99, 102, 241, 0.1);
+  color: #6366f1;
+}
+
+.tooltip {
+  position: absolute;
+  left: 80px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #222;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+
+.nav-item:hover .tooltip {
+  opacity: 1;
+}
+
+/* ===== Sidebar Footer ===== */
+.sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mode-btn,
+.logout-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.mode-btn:hover {
+  background: #6366f1;
+  color: white;
+}
+
+.logout-btn {
+  background: linear-gradient(to right, #ef4444, #dc2626);
+  color: white;
+}
+
+.logout-btn:hover {
+  opacity: 0.9;
+}
+
+/* ===== Main Section ===== */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.main-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 20px 40px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.user-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(to right, #6366f1, #8b5cf6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+}
+
+.new-board {
+  background: linear-gradient(to right, #6366f1, #8b5cf6);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.new-board:hover {
+  transform: scale(1.03);
+}
+
+/* ===== Boards ===== */
+.boards {
+  padding: 30px 40px;
+}
+
+.board-grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.board-card {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 16px;
+  padding: 20px;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  color: inherit;
+}
+
+.board-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.2);
+  color: #6366f1;
+}
+
+.no-boards {
+  font-style: italic;
+  color: gray;
+}
+
+/* ===== Modal ===== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal {
+  background: rgb(255, 249, 249);
+  padding: 30px;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2)
+}
+
+.modal input {
+  width: 100%;
+  padding: 10px;
+  margin-top: 10px;
+  margin-bottom: 20px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.cancel-btn,
+.create-btn {
+  border: none;
+  border-radius: 6px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.cancel-btn {
+  background: #e5e7eb;
+}
+
+.create-btn {
+  background: linear-gradient(to right, #6366f1, #8b5cf6);
+  color: white;
+}

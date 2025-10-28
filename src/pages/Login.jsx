@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -11,7 +11,7 @@ export default function Login() {
   const handleLogin = async (e) => {
     e.preventDefault()
 
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
@@ -19,13 +19,13 @@ export default function Login() {
     if (error) {
       setError(error.message)
     } else {
-      navigate('/messages') // We’ll create this page soon
+      navigate('/dashboard') // go to Dashboard after login
     }
   }
 
   return (
     <div style={{ padding: '2rem' }}>
-      <h2>Log In</h2>
+      <h2>🔑 Log In</h2>
       <form onSubmit={handleLogin}>
         <input
           type="email"
@@ -44,6 +44,10 @@ export default function Login() {
         <button type="submit">Log In</button>
         {error && <p style={{ color: 'red' }}>{error}</p>}
       </form>
+
+      <p style={{ marginTop: '1rem' }}>
+        Don’t have an account? <Link to="/signup">Sign Up</Link>
+      </p>
     </div>
   )
 }

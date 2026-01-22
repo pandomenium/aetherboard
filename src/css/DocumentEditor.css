@@ -1,0 +1,78 @@
+.doc-editor-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #f7f7fa;
+}
+
+.doc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 25px;
+  background: white;
+  border-bottom: 1px solid #ddd;
+}
+
+.save-btn {
+  padding: 8px 14px;
+  background: #6366f1;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.save-btn:hover {
+  background: #4f46e5;
+}
+
+/* Toolbar */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #ffffff;
+  padding: 10px 20px;
+  border-bottom: 1px solid #ddd;
+}
+
+.toolbar button,
+.toolbar select {
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  background: white;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.toolbar button:hover,
+.toolbar select:hover {
+  background: #f0f0ff;
+}
+
+.divider {
+  width: 1px;
+  height: 20px;
+  background: #ccc;
+}
+
+/* Editor area */
+.editor-area {
+  flex: 1;
+  padding: 25px;
+  max-width: 900px;
+  margin: auto;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  margin-top: 20px;
+  overflow-y: auto;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.editor-area:focus {
+  outline: 2px solid #6366f1;
+}

@@ -1,0 +1,98 @@
+.smartfilter-container {
+  padding: 30px 40px;
+}
+
+.sf-header h2 {
+  font-size: 28px;
+  color: #4f46e5;
+  margin-bottom: 5px;
+}
+
+.sf-header p {
+  color: #555;
+  margin-bottom: 20px;
+}
+
+/* Filters */
+.sf-controls {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.sf-controls input,
+.sf-controls select {
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+}
+
+/* Table */
+.sf-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.sf-table th {
+  background: #f3f4f6;
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.sf-table td {
+  padding: 12px;
+  border-bottom: 1px solid #f1f1f1;
+}
+
+.skill-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.skill-tag {
+  background: #eef2ff;
+  color: #4f46e5;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+/* Scores */
+.score-cell {
+  font-weight: bold;
+  color: #111;
+}
+
+/* Status tags */
+.status {
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: white;
+}
+
+.status.shortlisted {
+  background: #6366f1;
+}
+
+.status.pass {
+  background: #16a34a;
+}
+
+.status.fail {
+  background: #dc2626;
+}
+
+.no-results {
+  margin-top: 20px;
+  color: gray;
+  font-style: italic;
+}

@@ -1,32 +1,32 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient";
-import * as XLSX from "xlsx";
-import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
 
 export default function PayrollPage() {
   const [payrollRecords, setPayrollRecords] = useState([]);
   const [filteredRecords, setFilteredRecords] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+
+  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
+  const [cutoffType, setCutoffType] = useState("first"); // first = 1-15, second = 16-end
   const [filterStatus, setFilterStatus] = useState("All");
 
   useEffect(() => {
     loadPayroll();
   }, []);
 
+  /* =============================
+     LOAD PAYROLL RECORDS
+  ============================= */
   const loadPayroll = async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("payroll_records")
-      .select(
-        `
+      .select(`
         id,
         user_id,
-        profiles:profiles(full_name),
+        profiles:profiles(full_name, hourly_rate),
         cutoff_start,
         cutoff_end,
         total_hours,
@@ -37,269 +37,135 @@ export default function PayrollPage() {
         deductions,
         net_pay,
         status
-      `
-      )
+      `)
       .order("cutoff_end", { ascending: false });
 
     if (error) {
       console.error("Error loading payroll:", error);
+      setPayrollRecords([]);
+      setFilteredRecords([]);
     } else {
-      setPayrollRecords(data);
-      setFilteredRecords(data);
+      setPayrollRecords(data || []);
+      setFilteredRecords(data || []);
     }
 
     setLoading(false);
   };
 
-  // Filter by status
+  /* =============================
+     FILTER BY MONTH, CUTOFF & STATUS
+  ============================= */
   useEffect(() => {
-    if (filterStatus === "All") {
-      setFilteredRecords(payrollRecords);
-    } else {
-      setFilteredRecords(
-        payrollRecords.filter((p) => p.status === filterStatus)
+    let data = [...payrollRecords];
+
+    if (month) {
+      const [year, m] = month.split("-");
+      const lastDay = new Date(year, m, 0).getDate();
+      const cutoff_start =
+        cutoffType === "first" ? `${year}-${m}-01` : `${year}-${m}-16`;
+      const cutoff_end =
+        cutoffType === "first" ? `${year}-${m}-15` : `${year}-${m}-${lastDay}`;
+
+      data = data.filter(
+        (p) =>
+          p.cutoff_start >= cutoff_start &&
+          p.cutoff_end <= cutoff_end
       );
     }
-  }, [filterStatus, payrollRecords]);
 
-  const markAsPaid = async (id) => {
-    const { error } = await supabase
-      .from("payroll_records")
-      .update({ status: "Paid" })
-      .eq("id", id);
+    if (filterStatus !== "All") data = data.filter((p) => p.status === filterStatus);
 
-    if (error) {
-      alert("Error updating status: " + error.message);
-      return;
+    setFilteredRecords(data);
+  }, [month, cutoffType, filterStatus, payrollRecords]);
+
+  /* =============================
+     EXPORT PDF: Payslip per employee per cutoff
+  ============================= */
+  const exportPayslipPDF = async () => {
+    if (!filteredRecords.length) return alert("No records to export.");
+
+    const doc = new jsPDF({ orientation: "portrait" });
+
+    for (let i = 0; i < filteredRecords.length; i++) {
+      const p = filteredRecords[i];
+
+      // Header
+      doc.setFontSize(14);
+      doc.text("Payslip", 14, 15);
+      doc.setFontSize(11);
+      doc.text(`Employee: ${p.profiles?.full_name || "Unknown"}`, 14, 25);
+      doc.text(`Cutoff Period: ${p.cutoff_start} → ${p.cutoff_end}`, 14, 32);
+      doc.text(`Status: ${p.status}`, 14, 39);
+      doc.text(`Total Hours: ${p.total_hours.toFixed(2)}`, 14, 46);
+      doc.text(`Overtime Hours: ${p.overtime_hours.toFixed(2)}`, 14, 53);
+      doc.text(`Net Pay: ₱${p.net_pay.toFixed(2)}`, 14, 60);
+
+      // Fetch timesheet_entries for this employee in the cutoff
+      const { data: entries } = await supabase
+        .from("timesheet_entries")
+        .select(`work_date, task, hours`)
+        .eq("user_id", p.user_id)
+        .gte("work_date", p.cutoff_start)
+        .lte("work_date", p.cutoff_end)
+        .order("work_date", { ascending: true });
+
+      const tableBody = (entries || []).map((e) => [
+        e.work_date,
+        e.task,
+        e.hours.toFixed(2),
+        Math.max(e.hours - 8, 0).toFixed(2),
+      ]);
+
+      // Daily entries table
+      autoTable(doc, {
+        head: [["Date", "Task", "Hours", "OT Hours"]],
+        body: tableBody,
+        startY: 70,
+        styles: { fontSize: 10 },
+        headStyles: { fillColor: [40, 167, 69] },
+      });
+
+      if (i < filteredRecords.length - 1) doc.addPage(); // page break for next employee
     }
 
-    setPayrollRecords((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, status: "Paid" } : p))
-    );
-  };
-
-  const generatePayroll = async () => {
-    if (!startDate || !endDate) {
-      alert("Please select both start and end dates.");
-      return;
-    }
-
-    const confirmGenerate = window.confirm(
-      `Are you sure you want to generate payroll for ${startDate} to ${endDate}?`
-    );
-
-    if (!confirmGenerate) return;
-
-    setGenerating(true);
-
-    const { error } = await supabase.rpc("generate_payroll_records", {
-      start_date: startDate,
-      end_date: endDate,
-    });
-
-    if (error) {
-      alert("Error generating payroll: " + error.message);
-      console.error(error);
-    } else {
-      alert("✅ Payroll successfully generated!");
-      await loadPayroll();
-    }
-
-    setGenerating(false);
-  };
-
-  // Export to Excel
-  const exportToExcel = () => {
-    if (filteredRecords.length === 0) {
-      alert("No records to export.");
-      return;
-    }
-
-    const exportData = filteredRecords.map((p) => ({
-      Employee: p.profiles?.full_name || "Unknown",
-      "Cutoff Start": p.cutoff_start,
-      "Cutoff End": p.cutoff_end,
-      "Total Hours": p.total_hours,
-      "Overtime Hours": p.overtime_hours,
-      "Regular Pay": p.regular_pay,
-      "Overtime Pay": p.overtime_pay,
-      Deductions: p.deductions,
-      "Net Pay": p.net_pay,
-      Status: p.status,
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Payroll");
-
-    const fileName = `Payroll_${new Date().toISOString().slice(0, 10)}.xlsx`;
-    const wbout = XLSX.write(wb, { type: "array", bookType: "xlsx" });
-    saveAs(new Blob([wbout], { type: "application/octet-stream" }), fileName);
-  };
-
-  // Export to PDF
-  const exportToPDF = () => {
-    if (filteredRecords.length === 0) {
-      alert("No records to export.");
-      return;
-    }
-
-    const doc = new jsPDF({ orientation: "landscape" });
-    doc.setFontSize(14);
-    doc.text("Payroll Report", 14, 15);
-    doc.setFontSize(10);
-    doc.text(
-      `Generated: ${new Date().toLocaleString()}`,
-      14,
-      22
-    );
-
-    const tableData = filteredRecords.map((p) => [
-      p.profiles?.full_name || "Unknown",
-      `${p.cutoff_start} → ${p.cutoff_end}`,
-      p.total_hours.toFixed(2),
-      p.overtime_hours.toFixed(2),
-      `₱${p.regular_pay.toFixed(2)}`,
-      `₱${p.overtime_pay.toFixed(2)}`,
-      `₱${p.deductions?.toFixed(2) || 0}`,
-      `₱${p.net_pay.toFixed(2)}`,
-      p.status,
-    ]);
-
-    doc.autoTable({
-      head: [
-        [
-          "Employee",
-          "Cutoff Period",
-          "Total Hours",
-          "OT Hours",
-          "Regular Pay",
-          "OT Pay",
-          "Deductions",
-          "Net Pay",
-          "Status",
-        ],
-      ],
-      body: tableData,
-      startY: 30,
-      theme: "grid",
-      headStyles: { fillColor: [40, 167, 69] },
-      styles: { fontSize: 9 },
-    });
-
-    doc.save(`Payroll_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
+    doc.save(`Payslip_${month}_${cutoffType}.pdf`);
   };
 
   if (loading) return <p>Loading payroll records...</p>;
 
   return (
     <div style={{ padding: "2rem" }}>
-      <h2>👩‍💼 HR/Admin Payroll Records</h2>
-      <p>Manage, filter, generate, and export payroll data.</p>
+      <h2>📄 Employee Payslips</h2>
 
-      {/* Generate Payroll */}
-      <div
-        style={{
-          marginTop: "1.5rem",
-          padding: "1rem",
-          border: "1px solid #ddd",
-          borderRadius: "10px",
-          background: "#fafafa",
-        }}
-      >
-        <h3>🧮 Generate Payroll</h3>
-        <div
-          style={{
-            display: "flex",
-            gap: "1rem",
-            alignItems: "center",
-            flexWrap: "wrap",
-          }}
-        >
-          <div>
-            <label>Start Date: </label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-            />
-          </div>
-          <div>
-            <label>End Date: </label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-            />
-          </div>
-          <button
-            onClick={generatePayroll}
-            disabled={generating}
-            style={{
-              padding: "8px 14px",
-              backgroundColor: "#007bff",
-              color: "white",
-              border: "none",
-              borderRadius: "6px",
-              cursor: "pointer",
-            }}
-          >
-            {generating ? "Generating..." : "Generate Payroll"}
-          </button>
-        </div>
-      </div>
-
-      {/* Filter & Export */}
-      <div
-        style={{
-          marginTop: "2rem",
-          marginBottom: "1rem",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: "1rem",
-        }}
-      >
+      {/* Filters */}
+      <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem", flexWrap: "wrap" }}>
         <div>
-          <h3>📊 Payroll Records</h3>
+          <label>Month: </label>
+          <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
         </div>
-        <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-          <div>
-            <label>Status: </label>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              style={{
-                padding: "6px",
-                borderRadius: "6px",
-                border: "1px solid #ccc",
-              }}
-            >
-              <option value="All">All</option>
-              <option value="Pending">Pending</option>
-              <option value="Paid">Paid</option>
-            </select>
-          </div>
-          <button
-            onClick={exportToExcel}
-            style={btnGreen}
-          >
-            📁 Export Excel
-          </button>
-          <button
-            onClick={exportToPDF}
-            style={btnRed}
-          >
-            📄 Export PDF
-          </button>
+
+        <div>
+          <label>Cutoff: </label>
+          <select value={cutoffType} onChange={(e) => setCutoffType(e.target.value)}>
+            <option value="first">1–15</option>
+            <option value="second">16–End</option>
+          </select>
         </div>
+
+        <div>
+          <label>Status: </label>
+          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+            <option value="All">All</option>
+            <option value="Pending">Pending</option>
+            <option value="Paid">Paid</option>
+          </select>
+        </div>
+
+        <button onClick={exportPayslipPDF} style={btnRed}>📄 Export PDF</button>
       </div>
 
-      {/* Payroll Table */}
-      {filteredRecords.length === 0 ? (
-        <p>No payroll records found.</p>
-      ) : (
+      {/* Table */}
+      <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "#f5f5f5" }}>
@@ -307,88 +173,29 @@ export default function PayrollPage() {
               <th style={th}>Cutoff</th>
               <th style={th}>Hours</th>
               <th style={th}>OT</th>
-              <th style={th}>Regular Pay</th>
-              <th style={th}>OT Pay</th>
-              <th style={th}>Deductions</th>
               <th style={th}>Net Pay</th>
               <th style={th}>Status</th>
-              <th style={th}>Action</th>
             </tr>
           </thead>
           <tbody>
             {filteredRecords.map((p) => (
               <tr key={p.id}>
                 <td style={td}>{p.profiles?.full_name || "Unknown"}</td>
-                <td style={td}>
-                  {p.cutoff_start} → {p.cutoff_end}
-                </td>
+                <td style={td}>{p.cutoff_start} → {p.cutoff_end}</td>
                 <td style={td}>{p.total_hours.toFixed(2)}</td>
                 <td style={td}>{p.overtime_hours.toFixed(2)}</td>
-                <td style={td}>₱{p.regular_pay.toFixed(2)}</td>
-                <td style={td}>₱{p.overtime_pay.toFixed(2)}</td>
-                <td style={td}>₱{p.deductions?.toFixed(2) || 0}</td>
                 <td style={td}>₱{p.net_pay.toFixed(2)}</td>
-                <td style={td}>
-                  <span
-                    style={{
-                      color: p.status === "Paid" ? "green" : "orange",
-                      fontWeight: "bold",
-                    }}
-                  >
-                    {p.status}
-                  </span>
-                </td>
-                <td style={td}>
-                  {p.status === "Pending" && (
-                    <button
-                      onClick={() => markAsPaid(p.id)}
-                      style={{
-                        padding: "6px 10px",
-                        borderRadius: "6px",
-                        backgroundColor: "#4CAF50",
-                        color: "white",
-                        border: "none",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Mark as Paid
-                    </button>
-                  )}
-                </td>
+                <td style={td}><b>{p.status}</b></td>
               </tr>
             ))}
           </tbody>
         </table>
-      )}
+      </div>
     </div>
   );
 }
 
-const th = {
-  textAlign: "left",
-  padding: "10px",
-  borderBottom: "1px solid #ddd",
-};
-
-const td = {
-  padding: "10px",
-  borderBottom: "1px solid #eee",
-};
-
-const btnGreen = {
-  padding: "8px 14px",
-  backgroundColor: "#28a745",
-  color: "white",
-  border: "none",
-  borderRadius: "6px",
-  cursor: "pointer",
-};
-
-const btnRed = {
-  padding: "8px 14px",
-  backgroundColor: "#dc3545",
-  color: "white",
-  border: "none",
-  borderRadius: "6px",
-  cursor: "pointer",
-};
+/* Styles */
+const th = { textAlign: "left", padding: "10px", borderBottom: "1px solid #ddd" };
+const td = { padding: "10px", borderBottom: "1px solid #eee" };
+const btnRed = { padding: "8px 14px", backgroundColor: "#dc3545", color: "white", border: "none", borderRadius: "6px", cursor: "pointer" };

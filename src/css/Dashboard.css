@@ -1,5 +1,5 @@
 /* ===== Base ===== */
- body {
+body {
   margin: 0;
   font-family: "Inter", sans-serif;
   background: linear-gradient(to bottom right, #f9fafb, #e5e7eb);
@@ -9,8 +9,7 @@
 
 body.dark {
   background: linear-gradient(to bottom right, #12121f, #181826, #1c1c2b);
-  color: #000000;
-
+  color: #e5e7eb;
 }
 
 /* ===== Layout ===== */
@@ -20,6 +19,7 @@ body.dark {
   overflow: hidden;
 }
 
+/* ===== Sidebar ===== */
 .sidebar {
   display: flex;
   flex-direction: column;
@@ -27,9 +27,13 @@ body.dark {
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(12px);
   border-right: 1px solid rgba(0, 0, 0, 0.1);
-  transition: width 0.3s ease, background 0.3s ease;
+  transition: width 0.3s ease;
   padding: 20px;
   overflow-x: hidden;
+}
+
+body.dark .sidebar {
+  background: rgba(22, 22, 34, 0.85);
 }
 
 .sidebar.expanded {
@@ -113,7 +117,6 @@ nav {
   padding: 10px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s ease;
 }
 
 .mode-btn:hover {
@@ -126,11 +129,7 @@ nav {
   color: white;
 }
 
-.logout-btn:hover {
-  opacity: 0.9;
-}
-
-/* ===== Main Section ===== */
+/* ===== Main ===== */
 .main {
   flex: 1;
   display: flex;
@@ -148,12 +147,17 @@ nav {
   padding: 20px 40px;
 }
 
+body.dark .main-header {
+  background: rgba(27, 27, 43, 0.7);
+}
+
 .header-actions {
   display: flex;
   align-items: center;
   gap: 15px;
 }
 
+/* ===== Avatar ===== */
 .user-icon {
   width: 40px;
   height: 40px;
@@ -164,21 +168,76 @@ nav {
   justify-content: center;
   color: white;
   font-weight: bold;
-}
-
-.new-board {
-  background: linear-gradient(to right, #6366f1, #8b5cf6);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 16px;
   cursor: pointer;
-  transition: all 0.2s;
 }
 
-.new-board:hover {
-  transform: scale(1.03);
+/* ===== Avatar Dropdown (Bordio Style) ===== */
+
+.avatar-wrapper {
+  position: relative;
 }
+
+.account-menu {
+  position: absolute;
+  top: 52px;
+  right: 0;
+  width: 260px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 14px;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+}
+
+body.dark .account-menu {
+  background: #1f1f2f;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  text-decoration: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  transition: background 0.2s ease;
+}
+
+.menu-item:hover {
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.menu-icon {
+  width: 20px;
+  text-align: center;
+  font-size: 16px;
+}
+
+.menu-divider {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.08);
+  margin: 6px 0;
+}
+
+body.dark .menu-divider {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.menu-item.logout {
+  color: #ef4444;
+}
+
+.menu-item.logout:hover {
+  background: rgba(239, 68, 68, 0.12);
+}
+
 
 /* ===== Boards ===== */
 .boards {
@@ -193,72 +252,145 @@ nav {
 
 .board-card {
   background: rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 16px;
   padding: 20px;
-  transition: all 0.3s ease;
   text-decoration: none;
   color: inherit;
+  transition: all 0.3s ease;
+}
+
+body.dark .board-card {
+  background: rgba(34, 34, 58, 0.85);
 }
 
 .board-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.2);
-  color: #6366f1;
-}
-
-.no-boards {
-  font-style: italic;
-  color: gray;
+  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.25);
 }
 
 /* ===== Modal ===== */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .modal {
-  background: rgb(255, 249, 249);
+  background: white;
   padding: 30px;
   border-radius: 16px;
-  width: 100%;
   max-width: 400px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2)
-}
-
-.modal input {
   width: 100%;
-  padding: 10px;
-  margin-top: 10px;
-  margin-bottom: 20px;
-  border-radius: 8px;
-  border: 1px solid #ccc;
 }
 
-.modal-actions {
+body.dark .modal {
+  background: #1f1f2f;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===== Notifications ===== */
+.notif-wrapper {
+  position: relative;
+}
+
+.notif-icon {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(0, 0, 0, 0.08);
   display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-.cancel-btn,
-.create-btn {
-  border: none;
-  border-radius: 6px;
-  padding: 8px 14px;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
 }
 
-.cancel-btn {
-  background: #e5e7eb;
+.notif-icon:hover {
+  background: rgba(99, 102, 241, 0.12);
+  transform: translateY(-1px);
 }
 
-.create-btn {
-  background: linear-gradient(to right, #6366f1, #8b5cf6);
+.notif-dot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  background: #ef4444;
+  border-radius: 50%;
+}
+
+/* ===== Notification Dropdown ===== */
+.notif-menu {
+  position: absolute;
+  top: 52px;
+  right: 0;
+  width: 280px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 14px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+  padding: 14px;
+  z-index: 100;
+}
+
+.notif-menu h4 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #4f46e5;
+}
+
+.notif-item {
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.notif-item:hover {
+  background: rgba(99, 102, 241, 0.08);
+}
+
+/* ===== New Board Button ===== */
+.new-board.primary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
   color: white;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.35);
+  transition: all 0.25s ease;
 }
+
+.new-board.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(99, 102, 241, 0.45);
+}
+
+.new-board.primary:active {
+  transform: scale(0.97);
+}
+

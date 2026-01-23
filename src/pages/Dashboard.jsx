@@ -35,7 +35,10 @@ export default function Dashboard() {
       .select("role")
       .eq("id", id)
       .single();
-    if (data) setRole(data.role);
+
+    if (data) {
+      setRole(data.role);
+    }
   };
 
   /* ================= BOARDS ================= */
@@ -150,7 +153,7 @@ export default function Dashboard() {
           <div>
             <h2>Dashboard</h2>
             <p>
-              Welcome back, <strong>{user?.email}</strong>{" "}
+              Welcome back, <strong>{user?.user_metadata?.full_name}</strong>{" "}
               <em>({role || "Loading"})</em>
             </p>
           </div>
@@ -219,6 +222,10 @@ export default function Dashboard() {
                   <button className="menu-item" onClick={toggleDarkMode}>
                     {darkMode ? "☀️ Light Mode" : "🌙 Dark Mode"}
                   </button>
+
+                  <Link to="/feedback" className="menu-item">
+                    ✉️ Feedback
+                  </Link>
 
                   <div className="menu-divider" />
 

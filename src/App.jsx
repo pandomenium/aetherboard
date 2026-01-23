@@ -18,6 +18,7 @@ import DocumentEditor from './pages/DocumentEditor'
 import Documents from './pages/Documents'
 import Analytics from './pages/Analytics'
 import Settings from './pages/Settings'
+import Feedback from './pages/Feedback'
 import JuliaChat from './components/JuliaChat'
 
 
@@ -42,7 +43,8 @@ function App() {
         <Route path="/documents" element={<Documents />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/settings" element={<Settings />} />
-
+        <Route path="/feedback" element={<Feedback />} />
+        
       </Routes>
       <JuliaChat />
     </Router>

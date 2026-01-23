@@ -1,0 +1,31 @@
+.page-wrapper {
+  display: flex;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.feedback-container {
+  width: 100%;
+  max-width: 520px;
+}
+
+.feedback-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.feedback-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.primary-btn {
+  margin-top: 10px;
+}

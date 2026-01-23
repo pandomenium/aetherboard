@@ -17,7 +17,6 @@ export default function TimesheetPage() {
       const { data: { session } } = await supabase.auth.getSession()
       const currentUser = session?.user ?? null
       if (!currentUser) return
-
       setUser(currentUser)
       fetchTimesheet(currentUser.id)
     }
@@ -25,15 +24,13 @@ export default function TimesheetPage() {
   }, [weekStart])
 
   const fetchTimesheet = async (userId) => {
-    // Initialize empty daily data
-    const emptyData = weekdays.reduce((acc, day) => ({ 
-      ...acc, 
-      [day]: { task: '', hours: '', description: '' } 
+    const emptyData = weekdays.reduce((acc, day) => ({
+      ...acc,
+      [day]: { task: '', hours: '', description: '' }
     }), {})
     setTimesheetData(emptyData)
     setTotalHours(0)
 
-    // Check if a weekly timesheet exists
     const { data: weeklySheet } = await supabase
       .from('timesheets_new')
       .select('*')
@@ -43,7 +40,6 @@ export default function TimesheetPage() {
 
     if (!weeklySheet) return
 
-    // Fetch daily entries
     const { data: entries } = await supabase
       .from('timesheet_entries')
       .select('*')
@@ -52,13 +48,10 @@ export default function TimesheetPage() {
     if (entries) {
       const updated = {}
       entries.forEach(entry => {
-        const dayName = weekdays[entry.work_date ? new Date(entry.work_date).getDay() - 1 : 0]
+        const dayIndex = new Date(entry.work_date).getDay() - 1
+        const dayName = weekdays[dayIndex >= 0 ? dayIndex : 0]
         if (dayName) {
-          updated[dayName] = { 
-            task: entry.task, 
-            hours: entry.hours, 
-            description: entry.description 
-          }
+          updated[dayName] = { task: entry.task, hours: entry.hours, description: entry.description }
         }
       })
       setTimesheetData(updated)
@@ -83,15 +76,9 @@ export default function TimesheetPage() {
 
   const handleSubmitTimesheet = async () => {
     if (!user) return
-    if (totalHours < 40) {
-      alert('Total hours must be at least 40 before submitting.')
-      return
-    }
-
     setLoading(true)
 
-    // Check if weekly timesheet exists
-    const { data: weeklySheet, error: fetchError } = await supabase
+    const { data: weeklySheet } = await supabase
       .from('timesheets_new')
       .select('*')
       .eq('user_id', user.id)
@@ -113,15 +100,12 @@ export default function TimesheetPage() {
       timesheetId = newSheet[0].id
     }
 
-    // Insert/update daily entries
     for (let i = 0; i < weekdays.length; i++) {
       const day = weekdays[i]
       const entry = timesheetData[day]
-      if (!entry || entry.task === '' || entry.task === 'Rest Day') continue
-
+      if (!entry || entry.task === '') continue
       const workDate = format(addDays(weekStart, i), 'yyyy-MM-dd')
 
-      // Check if entry exists
       const { data: existing } = await supabase
         .from('timesheet_entries')
         .select('*')
@@ -145,76 +129,39 @@ export default function TimesheetPage() {
     alert('Timesheet submitted successfully!')
   }
 
-  const th = {
-  textAlign: 'left',
-  padding: '10px',
-  fontWeight: 600,
-  fontSize: '13px',
-  color: '#555'
-  }
+  const th = { textAlign: 'left', padding: '10px', fontWeight: 600, fontSize: '13px', color: '#555' }
+  const td = { padding: '8px' }
+  const input = { width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '13px' }
 
-  const td = {
-    padding: '8px'
-  }
-
-  const input = {
-    width: '100%',
-    padding: '6px 8px',
-    borderRadius: '6px',
-    border: '1px solid #ccc',
-    fontSize: '13px'
-  }
+  // Week range
+  const weekEnd = addDays(weekStart, 6)
+  const weekRange = `${format(weekStart, 'MMM d')} - ${format(weekEnd, 'd, yyyy')}`
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#f4f6f8',
-      padding: '2rem',
-      fontFamily: 'Inter, system-ui, sans-serif'
-    }}>
-      <div style={{
-        maxWidth: '1400px',
-        margin: '0 auto',
-        background: '#fff',
-        borderRadius: '12px',
-        padding: '2rem',
-        boxShadow: '0 10px 30px rgba(0,0,0,0.08)'
-      }}>
-
+    <div style={{ minHeight: '100vh', background: '#f4f6f8', padding: '2rem', fontFamily: 'Inter, system-ui, sans-serif' }}>
+      <div style={{ maxWidth: '1400px', margin: '0 auto', background: '#fff', borderRadius: '12px', padding: '2rem', boxShadow: '0 10px 30px rgba(0,0,0,0.08)' }}>
+        
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
           <h2 style={{ margin: 0 }}>🕒 Employee Timesheet</h2>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
             <button onClick={() => setWeekStart(subWeeks(weekStart, 1))}>⬅</button>
-            <strong>{format(weekStart, 'MMM d, yyyy')}</strong>
+            <strong>{weekRange}</strong>
             <button onClick={() => setWeekStart(addWeeks(weekStart, 1))}>➡</button>
-
             <input
               type="date"
               value={format(weekStart, 'yyyy-MM-dd')}
-              onChange={(e) =>
-                setWeekStart(startOfWeek(new Date(e.target.value), { weekStartsOn: 1 }))
-              }
-              style={{
-                marginLeft: '0.5rem',
-                padding: '0.4rem',
-                borderRadius: '6px',
-                border: '1px solid #ccc'
-              }}
+              onChange={(e) => setWeekStart(startOfWeek(new Date(e.target.value), { weekStartsOn: 1 }))}
+              style={{ marginLeft: '0.5rem', padding: '0.4rem', borderRadius: '6px', border: '1px solid #ccc' }}
             />
           </div>
         </div>
 
         {/* Table */}
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{
-            width: '100%',
-            borderCollapse: 'collapse',
-            fontSize: '14px'
-          }}>
-            <thead>
-              <tr style={{ background: '#f0f2f5' }}>
+        <div style={{ overflowX: 'auto', position: 'relative' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+            <thead style={{ position: 'sticky', top: 0, background: '#f0f2f5', zIndex: 1 }}>
+              <tr>
                 <th style={th}>Day</th>
                 <th style={th}>Task</th>
                 <th style={th}>Hours</th>
@@ -225,21 +172,16 @@ export default function TimesheetPage() {
               {weekdays.map((day, i) => {
                 const entry = timesheetData[day] || {}
                 const isRestDay = entry.task === 'Rest Day'
+                const dayDate = format(addDays(weekStart, i), 'MMM d')
 
                 return (
                   <tr key={day} style={{ borderBottom: '1px solid #eee' }}>
-                    <td style={td}><strong>{day}</strong></td>
+                    <td style={td}><strong>{day}</strong><br /><small>{dayDate}</small></td>
 
                     <td style={td}>
-                      <select
-                        value={entry.task || ''}
-                        onChange={(e) => handleTaskChange(day, e.target.value)}
-                        style={input}
-                      >
+                      <select value={entry.task || ''} onChange={(e) => handleTaskChange(day, e.target.value)} style={input}>
                         <option value="">Select task</option>
-                        {taskOptions.map(opt => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
+                        {taskOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                       </select>
                     </td>
 
@@ -255,7 +197,9 @@ export default function TimesheetPage() {
                         style={{
                           ...input,
                           width: '80px',
-                          background: isRestDay ? '#f5f5f5' : '#fff'
+                          background: isRestDay ? '#e0e0e0' : '#fff',
+                          color: isRestDay ? '#888' : '#000',
+                          cursor: isRestDay ? 'not-allowed' : 'text'
                         }}
                       />
                     </td>
@@ -269,7 +213,9 @@ export default function TimesheetPage() {
                         placeholder={isRestDay ? 'Rest day' : 'What did you work on?'}
                         style={{
                           ...input,
-                          background: isRestDay ? '#f5f5f5' : '#fff'
+                          background: isRestDay ? '#e0e0e0' : '#fff',
+                          color: isRestDay ? '#888' : '#000',
+                          cursor: isRestDay ? 'not-allowed' : 'text'
                         }}
                       />
                     </td>
@@ -281,39 +227,17 @@ export default function TimesheetPage() {
         </div>
 
         {/* Footer */}
-        <div style={{
-          marginTop: '1.5rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <div>
-            🧮 Total Hours:{' '}
-            <strong style={{
-              color: totalHours >= 40 ? '#2e7d32' : '#c62828'
-            }}>
-              {totalHours}
-            </strong>
-            {totalHours < 40 && (
-              <span style={{ marginLeft: '0.5rem', color: '#c62828', fontSize: '13px' }}>
-                (Minimum 40 required)
-              </span>
-            )}
-          </div>
-
-          <button
-            onClick={handleSubmitTimesheet}
-            disabled={loading}
-            style={{
-              padding: '0.6rem 1.4rem',
-              background: loading ? '#ccc' : '#4caf50',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              fontWeight: 600
-            }}
-          >
+        <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>🧮 Total Hours: <strong>{totalHours}</strong></div>
+          <button onClick={handleSubmitTimesheet} disabled={loading} style={{
+            padding: '0.6rem 1.4rem',
+            background: loading ? '#ccc' : '#4caf50',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: loading ? 'not-allowed' : 'pointer',
+            fontWeight: 600
+          }}>
             📤 Submit Timesheet
           </button>
         </div>
@@ -321,5 +245,4 @@ export default function TimesheetPage() {
       </div>
     </div>
   )
-
 }

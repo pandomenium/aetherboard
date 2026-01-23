@@ -2,6 +2,7 @@ import React, { StrictMode, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.jsx'
 import { supabase } from './supabaseClient'
+import './index.css'
 
 // Create a wrapper component to use useEffect
 function Root() {

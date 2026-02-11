@@ -284,7 +284,17 @@ export default function Analytics() {
       {/* Add Sale Modal */}
       {showSaleForm && (
         <Modal title="Add Sale" onClose={() => setShowSaleForm(false)}>
-          <input placeholder="Product" value={newSale.product} onChange={e => setNewSale({ ...newSale, product: e.target.value })} />
+          <select
+            value={newSale.product}
+            onChange={(e) =>
+              setNewSale({ ...newSale, product: e.target.value })
+            }
+          >
+            <option value="">Select Product</option>
+            <option value="Lugaw">Lugaw</option>
+            <option value="Calamarites">Calamarites</option>
+            <option value="Drinks">Drinks</option>
+          </select>
           <input type="number" placeholder="Total Amount" value={newSale.total_amount} onChange={e => setNewSale({ ...newSale, total_amount: e.target.value })} />
           <input type="date" value={newSale.sale_date} onChange={e => setNewSale({ ...newSale, sale_date: e.target.value })} />
           <button onClick={handleAddSale}>Save</button>

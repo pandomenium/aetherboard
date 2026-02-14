@@ -75,58 +75,92 @@ export default function TimesheetPage() {
   }
 
   const handleSubmitTimesheet = async () => {
-    if (!user) return
-    setLoading(true)
+    const confirmed = window.confirm(
+      "Are you sure you want to submit this timesheet? \nYou won't be able to edit it after submission."
+    )
 
-    const { data: weeklySheet } = await supabase
-      .from('timesheets_new')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('week_start', format(weekStart, 'yyyy-MM-dd'))
-      .maybeSingle()
-
-    let timesheetId
-    if (weeklySheet) {
-      timesheetId = weeklySheet.id
-      await supabase
-        .from('timesheets_new')
-        .update({ status: 'submitted' })
-        .eq('id', timesheetId)
-    } else {
-      const { data: newSheet } = await supabase
-        .from('timesheets_new')
-        .insert([{ user_id: user.id, week_start: format(weekStart, 'yyyy-MM-dd'), status: 'submitted' }])
-        .select()
-      timesheetId = newSheet[0].id
+    if (!confirmed) {
+      console.log("User cancelled submission")
+      return
     }
 
-    for (let i = 0; i < weekdays.length; i++) {
-      const day = weekdays[i]
-      const entry = timesheetData[day]
-      if (!entry || entry.task === '') continue
-      const workDate = format(addDays(weekStart, i), 'yyyy-MM-dd')
+    setLoading(true)
 
-      const { data: existing } = await supabase
-        .from('timesheet_entries')
+    try {
+      const { data: weeklySheet } = await supabase
+        .from('timesheets_new')
         .select('*')
-        .eq('timesheet_id', timesheetId)
-        .eq('work_date', workDate)
+        .eq('user_id', user.id)
+        .eq('week_start', format(weekStart, 'yyyy-MM-dd'))
         .maybeSingle()
 
-      if (existing) {
+      let timesheetId
+
+      if (weeklySheet) {
+        timesheetId = weeklySheet.id
         await supabase
-          .from('timesheet_entries')
-          .update({ task: entry.task, hours: entry.hours, description: entry.description, status: 'submitted' })
-          .eq('id', existing.id)
+          .from('timesheets_new')
+          .update({ status: 'submitted' })
+          .eq('id', timesheetId)
       } else {
-        await supabase
-          .from('timesheet_entries')
-          .insert([{ timesheet_id: timesheetId, user_id: user.id, work_date: workDate, task: entry.task, hours: entry.hours, description: entry.description, status: 'submitted' }])
+        const { data: newSheet } = await supabase
+          .from('timesheets_new')
+          .insert([{
+            user_id: user.id,
+            week_start: format(weekStart, 'yyyy-MM-dd'),
+            status: 'submitted'
+          }])
+          .select()
+
+        timesheetId = newSheet[0].id
       }
+
+      for (let i = 0; i < weekdays.length; i++) {
+        const day = weekdays[i]
+        const entry = timesheetData[day]
+        if (!entry || entry.task === '') continue
+
+        const workDate = format(addDays(weekStart, i), 'yyyy-MM-dd')
+
+        const { data: existing } = await supabase
+          .from('timesheet_entries')
+          .select('*')
+          .eq('timesheet_id', timesheetId)
+          .eq('work_date', workDate)
+          .maybeSingle()
+
+        if (existing) {
+          await supabase
+            .from('timesheet_entries')
+            .update({
+              task: entry.task,
+              hours: entry.hours,
+              description: entry.description,
+              status: 'submitted'
+            })
+            .eq('id', existing.id)
+        } else {
+          await supabase
+            .from('timesheet_entries')
+            .insert([{
+              timesheet_id: timesheetId,
+              user_id: user.id,
+              work_date: workDate,
+              task: entry.task,
+              hours: entry.hours,
+              description: entry.description,
+              status: 'submitted'
+            }])
+        }
+      }
+
+      alert('Timesheet submitted successfully!')
+    } catch (err) {
+      console.error(err)
+      alert("Submission failed")
     }
 
     setLoading(false)
-    alert('Timesheet submitted successfully!')
   }
 
   const th = { textAlign: 'left', padding: '10px', fontWeight: 600, fontSize: '13px', color: '#555' }
@@ -229,14 +263,24 @@ export default function TimesheetPage() {
         {/* Footer */}
         <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <div>🧮 Total Hours: <strong>{totalHours}</strong></div>
-          <button onClick={handleSubmitTimesheet} disabled={loading} style={{
+            {totalHours < 40 && (
+            <span style={{ marginLeft: '8px', color: '#c62828', fontSize: '13px' }}>
+              (Minimum 40 hours required to submit)
+            </span>
+            )}
+          <button 
+          type="button" 
+          onClick={handleSubmitTimesheet} 
+          disabled={loading || totalHours < 40} 
+          style={{
             padding: '0.6rem 1.4rem',
-            background: loading ? '#ccc' : '#4caf50',
+            background: loading || totalHours < 40 ? '#ccc' : '#4caf50',
             color: '#fff',
             border: 'none',
             borderRadius: '8px',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            fontWeight: 600
+            cursor: loading || totalHours < 40 ? 'not-allowed' : 'pointer',
+            fontWeight: 600,
+            transition: '0.2s'
           }}>
             📤 Submit Timesheet
           </button>

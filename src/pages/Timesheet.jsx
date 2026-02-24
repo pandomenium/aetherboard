@@ -11,6 +11,16 @@ export default function TimesheetPage() {
 
   const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
   const taskOptions = ['IT Management', 'Best Choice - iMall', 'Development', 'Testing', 'Vacation Leave', 'Sick Leave', 'Rest Day']
+  const isValidWeek = 
+    totalHours >= 40 &&
+    weekdays.every(day => {
+      const entry = timesheetData[day]
+      if (!entry) return true
+      if (entry.task === 'Rest Day') return true
+      if (!entry.task) return false
+      if (!entry.hours || parseFloat(entry.hours) <= 0) return false
+      return true
+    })
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -60,7 +70,30 @@ export default function TimesheetPage() {
   }
 
   const handleTaskChange = (day, value) => {
-    setTimesheetData(prev => ({ ...prev, [day]: { ...prev[day], task: value } }))
+    let hours = timesheetData[day]?.hours || ''
+
+    if (value === 'Vacation Leave' || value === 'Sick Leave') {
+      hours = 8
+    }
+
+    if (value === 'Rest Day') {
+      hours = 0
+    }
+
+    const updated = {
+      ...timesheetData,
+      [day]: {
+        ...timesheetData[day],
+        task: value,
+        hours
+      }
+    }
+
+    setTimesheetData(updated)
+
+    setTotalHours(
+      Object.values(updated).reduce((acc, d) => acc + (parseFloat(d.hours) || 0), 0)
+    )
   }
 
   const handleHourChange = (day, value) => {
@@ -75,6 +108,24 @@ export default function TimesheetPage() {
   }
 
   const handleSubmitTimesheet = async () => {
+    for (const day of weekdays) {
+    const entry = timesheetData[day]
+
+    if (!entry) continue
+
+    if (entry.task && entry.task !== 'Rest Day') {
+      if (!entry.hours || parseFloat(entry.hours) <= 0) {
+        alert(`Please enter valid hours for ${day}`)
+        return
+      }
+    }
+
+    if (entry.hours && !entry.task) {
+      alert(`Please select a task for ${day}`)
+      return
+     }
+    }
+
     const confirmed = window.confirm(
       "Are you sure you want to submit this timesheet? \nYou won't be able to edit it after submission."
     )
@@ -206,6 +257,7 @@ export default function TimesheetPage() {
               {weekdays.map((day, i) => {
                 const entry = timesheetData[day] || {}
                 const isRestDay = entry.task === 'Rest Day'
+                const isAutoEight = entry.task === 'Vacation Leave' || entry.task === 'Sick Leave'
                 const dayDate = format(addDays(weekStart, i), 'MMM d')
 
                 return (
@@ -225,15 +277,15 @@ export default function TimesheetPage() {
                         min="0"
                         max="8"
                         step="0.5"
-                        disabled={isRestDay}
+                        disabled={isRestDay || isAutoEight}
                         value={entry.hours || ''}
                         onChange={(e) => handleHourChange(day, e.target.value)}
                         style={{
                           ...input,
                           width: '80px',
-                          background: isRestDay ? '#e0e0e0' : '#fff',
-                          color: isRestDay ? '#888' : '#000',
-                          cursor: isRestDay ? 'not-allowed' : 'text'
+                          background: isRestDay || isAutoEight ? '#e0e0e0' : '#fff',
+                          color: isRestDay || isAutoEight ? '#888' : '#000',
+                          cursor: isRestDay || isAutoEight ? 'not-allowed' : 'text'
                         }}
                       />
                     </td>
@@ -271,14 +323,14 @@ export default function TimesheetPage() {
           <button 
           type="button" 
           onClick={handleSubmitTimesheet} 
-          disabled={loading || totalHours < 40} 
+          disabled={loading || !isValidWeek} 
           style={{
             padding: '0.6rem 1.4rem',
-            background: loading || totalHours < 40 ? '#ccc' : '#4caf50',
+            background: loading || !isValidWeek ? '#ccc' : '#4caf50',
             color: '#fff',
             border: 'none',
             borderRadius: '8px',
-            cursor: loading || totalHours < 40 ? 'not-allowed' : 'pointer',
+            cursor: loading || !isValidWeek ? 'not-allowed' : 'pointer',
             fontWeight: 600,
             transition: '0.2s'
           }}>

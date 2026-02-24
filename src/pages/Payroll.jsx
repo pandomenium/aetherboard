@@ -8,8 +8,8 @@ export default function PayrollPage() {
   const [filteredRecords, setFilteredRecords] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
-  const [cutoffType, setCutoffType] = useState("first"); // first = 1-15, second = 16-end
+  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [cutoffType, setCutoffType] = useState("first");
   const [filterStatus, setFilterStatus] = useState("All");
 
   useEffect(() => {
@@ -21,6 +21,7 @@ export default function PayrollPage() {
   ============================= */
   const loadPayroll = async () => {
     setLoading(true);
+
     const { data, error } = await supabase
       .from("payroll_records")
       .select(`
@@ -61,6 +62,7 @@ export default function PayrollPage() {
     if (month) {
       const [year, m] = month.split("-");
       const lastDay = new Date(year, m, 0).getDate();
+
       const cutoff_start =
         cutoffType === "first" ? `${year}-${m}-01` : `${year}-${m}-16`;
       const cutoff_end =
@@ -73,16 +75,21 @@ export default function PayrollPage() {
       );
     }
 
-    if (filterStatus !== "All") data = data.filter((p) => p.status === filterStatus);
+    if (filterStatus !== "All") {
+      data = data.filter((p) => p.status === filterStatus);
+    }
 
     setFilteredRecords(data);
   }, [month, cutoffType, filterStatus, payrollRecords]);
 
   /* =============================
-     EXPORT PDF: Payslip per employee per cutoff
+     EXPORT PDF
   ============================= */
   const exportPayslipPDF = async () => {
-    if (!filteredRecords.length) return alert("No records to export.");
+    if (!filteredRecords.length) {
+      alert("No records to export.");
+      return;
+    }
 
     const doc = new jsPDF({ orientation: "portrait" });
 
@@ -92,16 +99,32 @@ export default function PayrollPage() {
       // Header
       doc.setFontSize(14);
       doc.text("Payslip", 14, 15);
+
       doc.setFontSize(11);
       doc.text(`Employee: ${p.profiles?.full_name || "Unknown"}`, 14, 25);
       doc.text(`Cutoff Period: ${p.cutoff_start} → ${p.cutoff_end}`, 14, 32);
       doc.text(`Status: ${p.status}`, 14, 39);
-      doc.text(`Total Hours: ${p.total_hours.toFixed(2)}`, 14, 46);
-      doc.text(`Overtime Hours: ${p.overtime_hours.toFixed(2)}`, 14, 53);
-      doc.text(`Net Pay: ₱${p.net_pay.toFixed(2)}`, 14, 60);
 
-      // Fetch timesheet_entries for this employee in the cutoff
-      const { data: entries } = await supabase
+      doc.text(
+        `Total Hours: ${Number(p.total_hours || 0).toFixed(2)}`,
+        14,
+        46
+      );
+
+      doc.text(
+        `Overtime Hours: ${Number(p.overtime_hours || 0).toFixed(2)}`,
+        14,
+        53
+      );
+
+      doc.text(
+        `Net Pay: ₱${Number(p.net_pay || 0).toFixed(2)}`,
+        14,
+        60
+      );
+
+      // Fetch timesheet entries
+      const { data: entries, error } = await supabase
         .from("timesheet_entries")
         .select(`work_date, task, hours`)
         .eq("user_id", p.user_id)
@@ -109,14 +132,17 @@ export default function PayrollPage() {
         .lte("work_date", p.cutoff_end)
         .order("work_date", { ascending: true });
 
+      if (error) {
+        console.error("Error loading entries:", error);
+      }
+
       const tableBody = (entries || []).map((e) => [
         e.work_date,
-        e.task,
-        e.hours.toFixed(2),
-        Math.max(e.hours - 8, 0).toFixed(2),
+        e.task || "-",
+        Number(e.hours || 0).toFixed(2),
+        Math.max(Number(e.hours || 0) - 8, 0).toFixed(2),
       ]);
 
-      // Daily entries table
       autoTable(doc, {
         head: [["Date", "Task", "Hours", "OT Hours"]],
         body: tableBody,
@@ -125,7 +151,9 @@ export default function PayrollPage() {
         headStyles: { fillColor: [40, 167, 69] },
       });
 
-      if (i < filteredRecords.length - 1) doc.addPage(); // page break for next employee
+      if (i < filteredRecords.length - 1) {
+        doc.addPage();
+      }
     }
 
     doc.save(`Payslip_${month}_${cutoffType}.pdf`);
@@ -138,15 +166,29 @@ export default function PayrollPage() {
       <h2>📄 Employee Payslips</h2>
 
       {/* Filters */}
-      <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem", flexWrap: "wrap" }}>
+      <div
+        style={{
+          display: "flex",
+          gap: "1rem",
+          marginBottom: "1rem",
+          flexWrap: "wrap",
+        }}
+      >
         <div>
           <label>Month: </label>
-          <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+          <input
+            type="month"
+            value={month}
+            onChange={(e) => setMonth(e.target.value)}
+          />
         </div>
 
         <div>
           <label>Cutoff: </label>
-          <select value={cutoffType} onChange={(e) => setCutoffType(e.target.value)}>
+          <select
+            value={cutoffType}
+            onChange={(e) => setCutoffType(e.target.value)}
+          >
             <option value="first">1–15</option>
             <option value="second">16–End</option>
           </select>
@@ -154,14 +196,19 @@ export default function PayrollPage() {
 
         <div>
           <label>Status: </label>
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+          >
             <option value="All">All</option>
             <option value="Pending">Pending</option>
             <option value="Paid">Paid</option>
           </select>
         </div>
 
-        <button onClick={exportPayslipPDF} style={btnRed}>📄 Export PDF</button>
+        <button onClick={exportPayslipPDF} style={btnRed}>
+          📄 Export PDF
+        </button>
       </div>
 
       {/* Table */}
@@ -181,11 +228,21 @@ export default function PayrollPage() {
             {filteredRecords.map((p) => (
               <tr key={p.id}>
                 <td style={td}>{p.profiles?.full_name || "Unknown"}</td>
-                <td style={td}>{p.cutoff_start} → {p.cutoff_end}</td>
-                <td style={td}>{p.total_hours.toFixed(2)}</td>
-                <td style={td}>{p.overtime_hours.toFixed(2)}</td>
-                <td style={td}>₱{p.net_pay.toFixed(2)}</td>
-                <td style={td}><b>{p.status}</b></td>
+                <td style={td}>
+                  {p.cutoff_start} → {p.cutoff_end}
+                </td>
+                <td style={td}>
+                  {Number(p.total_hours || 0).toFixed(2)}
+                </td>
+                <td style={td}>
+                  {Number(p.overtime_hours || 0).toFixed(2)}
+                </td>
+                <td style={td}>
+                  ₱{Number(p.net_pay || 0).toFixed(2)}
+                </td>
+                <td style={td}>
+                  <b>{p.status}</b>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -196,6 +253,22 @@ export default function PayrollPage() {
 }
 
 /* Styles */
-const th = { textAlign: "left", padding: "10px", borderBottom: "1px solid #ddd" };
-const td = { padding: "10px", borderBottom: "1px solid #eee" };
-const btnRed = { padding: "8px 14px", backgroundColor: "#dc3545", color: "white", border: "none", borderRadius: "6px", cursor: "pointer" };
+const th = {
+  textAlign: "left",
+  padding: "10px",
+  borderBottom: "1px solid #ddd",
+};
+
+const td = {
+  padding: "10px",
+  borderBottom: "1px solid #eee",
+};
+
+const btnRed = {
+  padding: "8px 14px",
+  backgroundColor: "#dc3545",
+  color: "white",
+  border: "none",
+  borderRadius: "6px",
+  cursor: "pointer",
+};

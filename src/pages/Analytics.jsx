@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "../supabaseClient";
 import {
   LineChart,
@@ -30,8 +30,12 @@ export default function Analytics() {
   const [showExpenseForm, setShowExpenseForm] = useState(false);
 
   const [newSale, setNewSale] = useState({ product: "", total_amount: "", sale_date: "" });
-  const [newExpense, setNewExpense] = useState({ amount: "", expense_date: "", category: "Lugaw Expenses", department: "Sales" });
-
+  const [newExpense, setNewExpense] = useState({ amount: "", expense_date: "", category: "", department: "Sales" });
+  const formatCurrency = (value) => {
+    const number = value.replace(/[^\d]/g, "");
+    if (!number) return "";
+    return new Intl.NumberFormat("en-PH").format(number);
+  };
   // ------------------------------
   // Fetch sales
   // ------------------------------
@@ -76,14 +80,43 @@ export default function Analytics() {
   // Add Sale
   // ------------------------------
   const handleAddSale = async () => {
-    if (!newSale.product || !newSale.total_amount || !newSale.sale_date) return alert("Please fill all fields");
+    // Basic validation
+    if (!newSale.product || !newSale.total_amount || !newSale.sale_date) {
+      return alert("Please fill all fields.");
+    }
+
+    if (Number(newSale.total_amount) <= 0) {
+      return alert("Amount must be greater than 0.");
+    }
+
+    // Check for existing sale (same product, date, department)
+    const { data: existing, error: checkError } = await supabase
+      .from("sales")
+      .select("id")
+      .eq("product", newSale.product)
+      .eq("sale_date", newSale.sale_date)
+      .eq("department", "Sales");
+
+    if (checkError) {
+      return alert(checkError.message);
+    }
+
+    if (existing && existing.length > 0) {
+      return alert("This product already exists for this date.");
+    }
+
+    // Insert new sale
     const { error } = await supabase.from("sales").insert([{
       product: newSale.product,
-      total_amount: Number(newSale.total_amount),
+      total_amount: Number(newSale.total_amount.replace(/,/g, "")),
       sale_date: newSale.sale_date,
       department: "Sales",
     }]);
-    if (error) return alert(error.message);
+
+    if (error) {
+      return alert(error.message);
+    }
+
     setNewSale({ product: "", total_amount: "", sale_date: "" });
     setShowSaleForm(false);
     fetchSales();
@@ -93,15 +126,44 @@ export default function Analytics() {
   // Add Expense
   // ------------------------------
   const handleAddExpense = async () => {
-    if (!newExpense.amount || !newExpense.expense_date) return alert("Please fill all fields");
+    const amount = Number(newExpense.amount);
+
+    if (!newExpense.category || !newExpense.expense_date)
+      return alert("All fields are required.");
+
+    if (!amount || amount <= 0)
+      return alert("Amount must be greater than 0.");
+
+    // 🔥 Prevent duplicate category except "Other Expenses"
+    if (newExpense.category !== "Other Expenses") {
+      const { data: existing } = await supabase
+        .from("expenses")
+        .select("id")
+        .eq("category", newExpense.category)
+        .eq("expense_date", newExpense.expense_date)
+        .eq("department", "Sales");
+
+      if (existing && existing.length > 0) {
+        return alert("This category already exists for this date.");
+      }
+    }
+
     const { error } = await supabase.from("expenses").insert([{
-      amount: Number(newExpense.amount),
+      amount: Number(newExpense.amount.replace(/,/g, "")),
       expense_date: newExpense.expense_date,
       category: newExpense.category,
       department: "Sales",
     }]);
+
     if (error) return alert(error.message);
-    setNewExpense({ amount: "", expense_date: "", category: "Lugaw Expenses" });
+
+    setNewExpense({
+      amount: "",
+      expense_date: "",
+      category: "Lugaw Expenses",
+      department: "Sales",
+    });
+
     setShowExpenseForm(false);
     fetchExpenses();
   };
@@ -111,50 +173,59 @@ export default function Analytics() {
   // ------------------------------
   const salesPerPeriod = (() => {
     const data = [];
-    const today = new Date();
-    const year = today.getFullYear();
     const [yearStr, monthStr] = selectedMonth.split("-");
+    const year = Number(yearStr);
     const monthIndex = Number(monthStr) - 1;
     const startOfMonth = new Date(year, monthIndex, 1);
     const endOfMonth = new Date(year, monthIndex + 1, 0);
+    const today = new Date();
 
     if (selectedRange === "This Week") {
-      let referenceDate = today.getMonth() === monthIndex ? today : endOfMonth;
+      // start from Monday
+      const referenceDate = today.getMonth() === monthIndex ? today : endOfMonth;
       const weekStart = new Date(referenceDate);
-      weekStart.setDate(referenceDate.getDate() - referenceDate.getDay() + 1);
+      weekStart.setDate(referenceDate.getDate() - ((referenceDate.getDay() + 6) % 7)); // Monday as start
 
       for (let i = 0; i < 7; i++) {
         const d = new Date(weekStart);
         d.setDate(weekStart.getDate() + i);
         if (d.getMonth() === monthIndex) {
           const dayLabel = d.toLocaleDateString("en-US", { weekday: "short" });
-          const daySales = salesData.filter(s => new Date(s.sale_date).toDateString() === d.toDateString())
+          const daySales = salesData
+            .filter(s => new Date(s.sale_date).toDateString() === d.toDateString())
             .reduce((sum, s) => sum + s.total_amount, 0);
           data.push({ name: dayLabel, total: daySales });
         }
       }
     } else if (selectedRange === "This Month") {
-      let weekStart = new Date(startOfMonth);
       let weekNum = 1;
+      let weekStart = new Date(startOfMonth);
+
       while (weekStart <= endOfMonth) {
         const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekStart.getDate() + 6);
-        if (weekEnd > endOfMonth) weekEnd.setDate(endOfMonth.getDate());
-        const weekSales = salesData.filter(s => {
-          const d = new Date(s.sale_date);
-          return d >= weekStart && d <= weekEnd;
-        }).reduce((sum, s) => sum + s.total_amount, 0);
+        weekEnd.setDate(Math.min(weekStart.getDate() + 6, endOfMonth.getDate())); // cap at month end
+
+        const weekSales = salesData
+          .filter(s => {
+            const d = new Date(s.sale_date);
+            return d >= weekStart && d <= weekEnd;
+          })
+          .reduce((sum, s) => sum + s.total_amount, 0);
+
         data.push({ name: `Week ${weekNum}`, total: weekSales });
         weekNum++;
-        weekStart.setDate(weekStart.getDate() + 7);
+
+        weekStart.setDate(weekEnd.getDate() + 1); // next week starts after current week
       }
     } else if (selectedRange === "This Year") {
       for (let m = 0; m < 12; m++) {
-        const monthSales = salesData.filter(s => new Date(s.sale_date).getMonth() === m)
+        const monthSales = salesData
+          .filter(s => new Date(s.sale_date).getMonth() === m)
           .reduce((sum, s) => sum + s.total_amount, 0);
         data.push({ name: new Date(0, m).toLocaleString("en-US", { month: "long" }), total: monthSales });
       }
     }
+
     return data;
   })();
 
@@ -283,29 +354,69 @@ export default function Analytics() {
 
       {/* Add Sale Modal */}
       {showSaleForm && (
-        <Modal title="Add Sale" onClose={() => setShowSaleForm(false)}>
+        <Modal
+          title="Add Sale"
+          onClose={() => setShowSaleForm(false)}
+          onSave={handleAddSale}
+        >
           <select
             value={newSale.product}
             onChange={(e) =>
               setNewSale({ ...newSale, product: e.target.value })
             }
+            style={inputStyle}
           >
             <option value="">Select Product</option>
             <option value="Lugaw">Lugaw</option>
             <option value="Calamarites">Calamarites</option>
             <option value="Drinks">Drinks</option>
           </select>
-          <input type="number" placeholder="Total Amount" value={newSale.total_amount} onChange={e => setNewSale({ ...newSale, total_amount: e.target.value })} />
-          <input type="date" value={newSale.sale_date} onChange={e => setNewSale({ ...newSale, sale_date: e.target.value })} />
-          <button onClick={handleAddSale}>Save</button>
+
+          <input
+            autoFocus
+            type="text"
+            placeholder="₱ 0.00"
+            value={newSale.total_amount}
+            onChange={(e) =>
+              setNewSale({
+                ...newSale,
+                total_amount: formatCurrency(e.target.value),
+              })
+            }
+            style={{
+              ...inputStyle,
+              textAlign: "center",
+              fontWeight: "bold",
+              fontSize: 18,
+            }}
+          />
+
+          <input
+            type="date"
+            value={newSale.sale_date}
+            onChange={(e) =>
+              setNewSale({ ...newSale, sale_date: e.target.value })
+            }
+            style={inputStyle}
+          />
         </Modal>
       )}
-
+      
       {/* Add Expense Modal */}
       {showExpenseForm && (
-        <Modal title="Add Expense" onClose={() => setShowExpenseForm(false)}>
-          <input type="number" placeholder="Amount" value={newExpense.amount} onChange={e => setNewExpense({ ...newExpense, amount: e.target.value })} />
-          <select value={newExpense.category} onChange={e => setNewExpense({ ...newExpense, category: e.target.value })}>
+        <Modal
+          title="Add Expense"
+          onClose={() => setShowExpenseForm(false)}
+          onSave={handleAddExpense}
+        > 
+          <select
+            value={newExpense.category}
+            onChange={(e) =>
+              setNewExpense({ ...newExpense, category: e.target.value })
+            }
+            style={inputStyle}
+          >
+            <option value="">Select Expenses</option>
             <option value="Lugaw Expenses">Lugaw Expenses</option>
             <option value="Calamarites Expenses">Calamarites Expenses</option>
             <option value="Salary">Salary</option>
@@ -314,8 +425,34 @@ export default function Analytics() {
             <option value="Water">Water</option>
             <option value="Other Expenses">Other Expenses</option>
           </select>
-          <input type="date" value={newExpense.expense_date} onChange={e => setNewExpense({ ...newExpense, expense_date: e.target.value })} />
-          <button onClick={handleAddExpense}>Save</button>
+
+          <input
+            autoFocus
+            type="text"
+            placeholder="₱ 0.00"
+            value={newExpense.amount}
+            onChange={(e) =>
+              setNewExpense({
+                ...newExpense,
+                amount: formatCurrency(e.target.value),
+              })
+            }
+            style={{
+              ...inputStyle,
+              textAlign: "center",
+              fontWeight: "bold",
+              fontSize: 18,
+            }}
+          />
+
+          <input
+            type="date"
+            value={newExpense.expense_date}
+            onChange={(e) =>
+              setNewExpense({ ...newExpense, expense_date: e.target.value })
+            }
+            style={inputStyle}
+          />
         </Modal>
       )}
     </div>
@@ -331,14 +468,109 @@ function ChartCard({ title, children }) {
   );
 }
 
-function Modal({ title, children, onClose }) {
+function Modal({ title, children, onClose, onSave }) {
+  const modalRef = useRef(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    setTimeout(() => setVisible(true), 10);
+  }, []);
+
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", padding: 20, borderRadius: 12, width: 320, display: "flex", flexDirection: "column", gap: 12 }}>
-        <h3>{title}</h3>
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.35)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+        backdropFilter: "blur(4px)",
+      }}
+    >
+      <div
+        ref={modalRef}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "#ffffff",
+          padding: 28,
+          borderRadius: 16,
+          width: 360,
+          display: "flex",
+          flexDirection: "column",
+          gap: 16,
+          transform: visible ? "translateY(0px)" : "translateY(-20px)",
+          opacity: visible ? 1 : 0,
+          transition: "all 0.25s ease",
+          boxShadow: "0 20px 40px rgba(0,0,0,0.15)",
+        }}
+      >
+        <h3 style={{ textAlign: "center", marginBottom: 5 }}>
+          {title}
+        </h3>
+
         {children}
-        <button onClick={onClose} style={{ marginTop: 10 }}>Cancel</button>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            marginTop: 10,
+          }}
+        >
+          <button
+            onClick={onClose}
+            style={cancelBtnStyle}
+            onMouseOver={(e) => (e.target.style.opacity = 0.85)}
+            onMouseOut={(e) => (e.target.style.opacity = 1)}
+          >
+            Cancel
+          </button>
+
+          <button
+            onClick={onSave}
+            style={saveBtnStyle}
+            onMouseOver={(e) => (e.target.style.opacity = 0.85)}
+            onMouseOut={(e) => (e.target.style.opacity = 1)}
+          >
+            Save
+          </button>
+          
+        </div>
       </div>
     </div>
   );
 }
+
+const saveBtnStyle = {
+  background: "linear-gradient(135deg, #16a34a, #22c55e)",
+  color: "white",
+  border: "none",
+  padding: "8px 16px",
+  borderRadius: 10,
+  cursor: "pointer",
+  fontWeight: "bold",
+  transition: "all 0.2s",
+};
+
+const cancelBtnStyle = {
+  background: "#ef4444",
+  color: "white",
+  border: "none",
+  padding: "8px 16px",
+  borderRadius: 10,
+  cursor: "pointer",
+  fontWeight: "bold",
+  transition: "all 0.2s",
+};
+
+const inputStyle = {
+  padding: 10,
+  borderRadius: 10,
+  border: "1px solid #e5e7eb",
+  outline: "none",
+  fontSize: 14,
+  transition: "all 0.2s",
+};
